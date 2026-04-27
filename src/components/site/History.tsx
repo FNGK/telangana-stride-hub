@@ -55,6 +55,7 @@ export const History = () => {
                 src={teamCelebration}
                 alt="Hyderabad Globe FC squad celebrating after a 2025 victory"
                 loading="lazy"
+                decoding="async"
                 width={1920}
                 height={1280}
                 className="aspect-[4/3] w-full object-cover"
@@ -69,6 +70,7 @@ export const History = () => {
                 src={teamLineup}
                 alt="Hyderabad Globe FC official team lineup"
                 loading="lazy"
+                decoding="async"
                 width={1280}
                 height={1920}
                 className="h-full w-full object-cover aspect-[3/4] md:aspect-auto"

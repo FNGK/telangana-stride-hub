@@ -14,6 +14,8 @@ export const Hero = () => {
           height={1080}
           className="h-full w-full object-cover animate-ken-burns"
           fetchPriority="high"
+          loading="eager"
+          decoding="async"
         />
         <div className="absolute inset-0 bg-gradient-hero" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,hsl(var(--accent)/0.15),transparent_60%)]" />
