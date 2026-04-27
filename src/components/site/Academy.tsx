@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
-import { CheckCircle2, Send } from "lucide-react";
+import { CheckCircle2, Send, Trash2, Inbox } from "lucide-react";
 import { toast } from "sonner";
+import { addTrial, listTrials, removeTrial, STATUS_META, type TrialRecord } from "@/lib/trials";
 
 const schema = z.object({
   name: z.string().trim().min(2, "Name too short").max(80),
@@ -16,6 +17,18 @@ const schema = z.object({
 export const Academy = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sent, setSent] = useState(false);
+  const [trials, setTrials] = useState<TrialRecord[]>([]);
+
+  useEffect(() => {
+    const sync = () => setTrials(listTrials());
+    sync();
+    window.addEventListener("hgfc:trials-updated", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("hgfc:trials-updated", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -30,8 +43,16 @@ export const Academy = () => {
       return;
     }
     setErrors({});
+    addTrial({
+      name: result.data.name,
+      age: result.data.age,
+      position: result.data.position,
+      phone: result.data.phone,
+      email: result.data.email,
+      message: result.data.message,
+    });
     setSent(true);
-    toast.success("Trial request received. We'll be in touch within 48 hours.");
+    toast.success("Trial request received. Track its status below.");
     e.currentTarget.reset();
     setTimeout(() => setSent(false), 4000);
   };
@@ -128,8 +149,72 @@ export const Academy = () => {
             </button>
           </motion.form>
         </div>
+
+        {/* Trial status tracker */}
+        <TrialTracker trials={trials} onRemove={(id) => { removeTrial(id); toast("Trial removed from this device."); }} />
       </div>
     </section>
+  );
+};
+
+const TrialTracker = ({ trials, onRemove }: { trials: TrialRecord[]; onRemove: (id: string) => void }) => {
+  if (trials.length === 0) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.7 }}
+      className="mt-16 rounded-sm glass p-7 md:p-9 shadow-elevated"
+    >
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <Inbox className="h-5 w-5 text-accent" strokeWidth={1.75} />
+          <div>
+            <div className="eyebrow !text-accent">Your trial requests</div>
+            <p className="text-xs text-background/60 mt-1">Stored on this device. Status updates roll in as our scouts review.</p>
+          </div>
+        </div>
+        <span className="rounded-sm bg-background/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-background/80">
+          {trials.length} {trials.length === 1 ? "request" : "requests"}
+        </span>
+      </div>
+      <ul className="divide-y divide-background/10">
+        {trials.map((t) => {
+          const meta = STATUS_META[t.status];
+          return (
+            <li key={t.id} className="py-4 flex flex-wrap items-center gap-4 justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-display text-lg uppercase text-background">{t.name}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent">
+                    {t.position} · Age {t.age}
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-background/55">
+                  Submitted {new Date(t.submittedAt).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}
+                  {" · "}
+                  Ref <span className="font-mono">{t.id.slice(2, 10)}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`rounded-sm border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.22em] ${meta.tone}`}>
+                  {meta.label}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRemove(t.id)}
+                  aria-label={`Remove trial for ${t.name}`}
+                  className="rounded-sm p-1.5 text-background/50 hover:text-destructive hover:bg-background/10 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </motion.div>
   );
 };
 
