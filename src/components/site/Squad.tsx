@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Search, X } from "lucide-react";
 import { players, type Position } from "@/data/players";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 const filters: { key: "ALL" | Position; label: string }[] = [
   { key: "ALL", label: "All" },
@@ -10,9 +12,43 @@ const filters: { key: "ALL" | Position; label: string }[] = [
   { key: "FWD", label: "Forwards" },
 ];
 
+type SortKey = "number" | "name" | "goals" | "assists" | "apps";
+
+const sorts: { key: SortKey; label: string }[] = [
+  { key: "number", label: "Squad #" },
+  { key: "name", label: "Name A–Z" },
+  { key: "goals", label: "Top scorers" },
+  { key: "assists", label: "Top assists" },
+  { key: "apps", label: "Most apps" },
+];
+
 export const Squad = () => {
   const [active, setActive] = useState<"ALL" | Position>("ALL");
-  const list = active === "ALL" ? players : players.filter((p) => p.position === active);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortKey>("number");
+
+  const list = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    let out = active === "ALL" ? players : players.filter((p) => p.position === active);
+    if (q) {
+      out = out.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          String(p.number).includes(q) ||
+          p.position.toLowerCase().includes(q),
+      );
+    }
+    const sorted = [...out].sort((a, b) => {
+      switch (sort) {
+        case "name": return a.name.localeCompare(b.name);
+        case "goals": return b.stats.goals - a.stats.goals;
+        case "assists": return b.stats.assists - a.stats.assists;
+        case "apps": return b.stats.apps - a.stats.apps;
+        default: return a.number - b.number;
+      }
+    });
+    return sorted;
+  }, [active, query, sort]);
 
   return (
     <section id="squad" className="relative bg-background py-24 md:py-36">
@@ -47,13 +83,58 @@ export const Squad = () => {
           </div>
         </div>
 
+        {/* Search + sort toolbar */}
+        <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="relative w-full md:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" strokeWidth={1.75} />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name, number, position…"
+              aria-label="Search squad"
+              className="w-full rounded-sm border border-border bg-surface pl-10 pr-9 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent transition-colors"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="squad-sort" className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
+              Sort
+            </label>
+            <select
+              id="squad-sort"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className="rounded-sm border border-border bg-surface px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-foreground focus:border-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent transition-colors"
+            >
+              {sorts.map((s) => (
+                <option key={s.key} value={s.key}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <motion.ul
-          key={active}
+          key={`${active}-${sort}-${query}`}
           initial="hidden"
           animate="show"
           variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08 } } }}
           className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
         >
+          {list.length === 0 && (
+            <li className="col-span-full rounded-sm border border-dashed border-border bg-surface p-12 text-center text-sm text-muted-foreground">
+              No players match <span className="font-semibold text-foreground">"{query}"</span>. Try a different search.
+            </li>
+          )}
           {list.map((p) => (
             <motion.li
               key={p.id}
@@ -61,10 +142,9 @@ export const Squad = () => {
               className="group tactile-card relative overflow-hidden rounded-sm bg-surface shadow-tactile"
             >
               <div className="relative aspect-[3/4] overflow-hidden bg-muted">
-                <img
+                <OptimizedImage
                   src={p.image}
                   alt={`${p.name}, #${p.number}, ${p.position}`}
-                  loading="lazy"
                   className="h-full w-full object-cover object-top grayscale-[0.15] transition-all duration-700 group-hover:grayscale-0 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/10 to-transparent" />
